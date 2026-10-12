@@ -1,0 +1,58 @@
+
+name: Microservices CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Users Service
+        run: docker build -t users-service ./users-service
+
+      - name: Build Orders Service
+        run: docker build -t orders-service ./orders-service
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Check Users Service
+        run: |
+          for i in {1..15}; do
+            if curl -fsS http://localhost:5001/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+
+      - name: Check Orders Service
+        run: |
+          for i in {1..15}; do
+            if curl -fsS http://localhost:5002/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+
+      - name: Check Orders API
+        run: curl -fsS http://localhost:5002/orders
+
+      - name: Stop services
+        if: always()
+        run: docker compose down
+
